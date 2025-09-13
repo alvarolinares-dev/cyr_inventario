@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>C&R Logística - Seguimiento de Pedidos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div class="h-screen flex flex-col font-sans bg-gray-100">
+    <!-- Header -->
+    <header class="bg-gray-800 text-white p-4 shadow-lg flex-shrink-0">
+      <div class="flex justify-between items-center max-w-7xl mx-auto">
+        <h1 class="text-3xl font-extrabold tracking-tight">C&R Logística</h1>
+        <nav class="flex items-center space-x-4">
+          <a href="{% url 'index' %}" class="py-2 px-4 rounded-lg font-semibold transition-colors duration-200 hover:bg-gray-700">
+            Dashboard
+          </a>
+          <a href="{% url 'seguimiento' %}" class="py-2 px-4 rounded-lg font-semibold transition-colors duration-200 bg-gray-700">
+            Seguimiento de pedidos
+          </a>
+          <a href="{% url 'gestion_datos' %}" class="py-2 px-4 rounded-lg font-semibold transition-colors duration-200 hover:bg-gray-700">
+            Gestión de datos
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="flex-grow overflow-hidden relative">
+      <div id="order-history-view" class="absolute inset-0 p-4 overflow-y-auto view-active max-w-7xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-3xl font-bold text-gray-800">Historial de Notas de Pedido</h2>
+          <div class="flex items-center gap-2">
+            <button id="export-pdf-btn" class="px-4 py-2 bg-rose-600 text-white rounded-lg shadow hover:bg-rose-700 transition">
+              Exportar PDF
+            </button>
+            <button id="export-csv-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition">
+              Exportar CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Filtros -->
+        <form method="get" class="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0 sm:space-x-4">
+          <input type="text" id="search-input" name="q" placeholder="Buscar por número, producto, orden, destinatario..."
+                 class="flex-grow max-w-md p-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200">
+
+          <div class="flex items-center space-x-2">
+            <label for="start-date" class="text-gray-700">Desde:</label>
+            <input type="date" id="start-date" name="start_date"
+                   class="p-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200">
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <label for="end-date" class="text-gray-700">Hasta:</label>
+            <input type="date" id="end-date" name="end_date"
+                   class="p-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200">
+          </div>
+
+          <button type="button" id="apply-filters-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition">
+            Aplicar filtros
+          </button>
+        </form>
+
+        <!-- Tabla -->
+        <div class="bg-white shadow-xl rounded-lg overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <input id="select-all" type="checkbox" class="h-4 w-4">
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"># Nota</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Productos</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Destinatario</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Orden</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="notas-tbody" class="bg-white divide-y divide-gray-200">
+                <tr id="loading-row">
+                  <td colspan="8" class="px-6 py-6 text-center text-gray-500">Cargando notas...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    /* ================= UTILIDADES ================= */
+    const safeText = (t) => (t === null || t === undefined) ? '-' : String(t);
+    const toDate = (v) => { const d = new Date(v); return isNaN(d) ? new Date() : d; };
+
+    function parseFecha(nota) {
+      if (nota?.fecha) return toDate(nota.fecha);
+      if (nota?.created_at) return toDate(nota.created_at);
+      if (nota?.createdAt) return toDate(nota.createdAt);
+      if (nota?.timestamp) return toDate(nota.timestamp);
+      if (typeof nota?.id === 'string') {
+        const m = nota.id.match(/^nota-(\d{10,13})/); if (m) return toDate(Number(m[1]));
+      }
+      return new Date();
+    }
+
+    function formatFechaAmigable(d) {
+      try {
+        return new Intl.DateTimeFormat('es-PE', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }).format(d);
+      } catch { return d.toLocaleString('es-PE'); }
+    }
+
+    function obtenerTipoNormalizado(nota) {
+      const t = String(nota?.tipo || '').toLowerCase();
+      if (t === 'entrada') return 'Entrada';
+      if (t === 'salida')  return 'Salida';
+      return nota?.tipo ? (nota.tipo[0].toUpperCase()+nota.tipo.slice(1)) : '-';
+    }
+
+    function obtenerDestinatario(nota) {
+      if (nota.proveedor) {
+        if (typeof nota.proveedor === 'string') return `Proveedor: ${nota.proveedor}`;
+        const n = nota.proveedor.nombre || nota.proveedor_name || nota.proveedor.razon || '';
+        return `Proveedor: ${n || '-'}`;
+      }
+      if (nota.cliente) {
+        if (typeof nota.cliente === 'string') return `Cliente: ${nota.cliente}`;
+        const n = nota.cliente.nombre || nota.cliente_name || '';
+        return `Cliente: ${n || '-'}`;
+      }
+      if (nota.entidad_nombre) return safeText(nota.entidad_nombre);
+      return '-';
+    }
+
+    function obtenerProductosComoLista(nota) {
+      const out = [];
+      if (Array.isArray(nota.productos)) {
+        nota.productos.forEach(p=>{
+          const nombre = p.nombre || p.producto || p.name || p?.producto?.nombre || '';
+          const cant = p.cantidad ?? p.qty ?? p.quantity;
+          out.push(cant!==undefined ? `${nombre} (x${cant})` : `${nombre}`);
+        });
+        return out;
+      }
+      if (Array.isArray(nota.items)) {
+        nota.items.forEach(it=>{
+          let nombre = it.producto?.nombre || it.producto_nombre || it.nombre || it.name || it.producto || '';
+          const cant = it.cantidad ?? it.qty ?? it.quantity;
+          out.push(cant!==undefined ? `${nombre} (x${cant})` : `${nombre}`);
+        });
+        return out;
+      }
+      if (nota.productos_text) return [nota.productos_text];
+      return [];
+    }
+
+    const obtenerOrden = (n) => safeText(n.orden || n.orden_compra || n.orden_venta || n.ordenCompra || '-');
+
+    /* =============== CSRF (para DELETE) =============== */
+    function getCookie(name) {
+      const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+      return m ? m.pop() : '';
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    /* ================= DATOS ================= */
+    async function cargarNotas() {
+      try {
+        const res = await fetch('/api/notas/');
+        if (res.ok) {
+          const data = await res.json();
+          return (Array.isArray(data) ? data : []).map(n => ({
+            ...n,
+            _fecha: parseFecha(n),
+            proveedor: n.proveedor || (n.proveedor_nombre ? { nombre: n.proveedor_nombre } : null),
+            cliente:   n.cliente   || (n.cliente_nombre   ? { nombre: n.cliente_nombre }   : null),
+          }));
+        }
+      } catch {}
+      const raw = JSON.parse(localStorage.getItem('notas_pedido') || '[]');
+      return (Array.isArray(raw) ? raw : []).map(n => ({...n, _fecha: parseFecha(n)}));
+    }
+
+    function numerarPorAnio(notas) {
+      const counters = {};
+      notas.sort((a,b)=>a._fecha - b._fecha);
+      notas.forEach(n=>{
+        const y = n._fecha.getFullYear();
+        counters[y] = (counters[y] || 0) + 1;
+        n._numero = `N${y}_${String(counters[y]).padStart(4,'0')}`;
+      });
+      return notas;
+    }
+
+    /* ======== SELECCIÓN ======== */
+    const selectedIds = new Set();
+
+    function updateSelectAllState() {
+      const selectAll = document.getElementById('select-all');
+      const checks = [...document.querySelectorAll('#notas-tbody .nota-check')];
+      const checked = checks.filter(c => c.checked).length;
+      if (checks.length === 0) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+        return;
+      }
+      selectAll.checked = checked === checks.length;
+      selectAll.indeterminate = checked > 0 && checked < checks.length;
+    }
+
+    /* ======== RENDER ======== */
+    function renderNotas(notas) {
+      const tbody = document.getElementById('notas-tbody');
+      tbody.innerHTML = '';
+      if (!notas.length) {
+        tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-6 text-center text-gray-500">No hay notas de pedido registradas.</td></tr>`;
+        updateSelectAllState();
+        return;
+      }
+
+      notas.slice().reverse().forEach(nota=>{
+        const tr = document.createElement('tr');
+
+        // Selección
+        const tdSel = document.createElement('td');
+        tdSel.className='px-3 py-4 whitespace-nowrap text-sm text-gray-700';
+        const checked = selectedIds.has(String(nota.id));
+        tdSel.innerHTML = `<input type="checkbox" class="nota-check h-4 w-4" value="${nota.id}" ${checked ? 'checked' : ''} aria-label="Seleccionar nota">`;
+
+        const tdN = document.createElement('td');
+        tdN.className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800';
+        tdN.textContent = nota._numero || '-';
+
+        const tdF = document.createElement('td');
+        tdF.className='px-6 py-4 whitespace-nowrap text-sm text-gray-700';
+        tdF.textContent = formatFechaAmigable(nota._fecha||new Date());
+
+        const tipo = obtenerTipoNormalizado(nota);
+        const tdT = document.createElement('td');
+        tdT.className='px-6 py-4 whitespace-nowrap text-sm font-semibold';
+        if (tipo.toLowerCase()==='entrada') tdT.classList.add('text-green-600');
+        else if (tipo.toLowerCase()==='salida') tdT.classList.add('text-red-600');
+        else tdT.classList.add('text-gray-600');
+        tdT.textContent = tipo;
+
+        const tdP = document.createElement('td');
+        tdP.className='px-6 py-4 whitespace-normal text-sm text-gray-700 max-w-[380px]';
+        const lines = obtenerProductosComoLista(nota);
+        if (!lines.length) tdP.textContent='-';
+        else {
+          const ul=document.createElement('ul'); ul.className='list-disc pl-5';
+          lines.forEach(l=>{ const li=document.createElement('li'); li.className='text-sm'; li.textContent=l; ul.appendChild(li); });
+          tdP.appendChild(ul);
+        }
+
+        const tdD = document.createElement('td');
+        tdD.className='px-6 py-4 whitespace-nowrap text-sm text-gray-700';
+        tdD.textContent = obtenerDestinatario(nota);
+
+        const tdO = document.createElement('td');
+        tdO.className='px-6 py-4 whitespace-nowrap text-sm text-gray-700';
+        tdO.textContent = obtenerOrden(nota);
+
+        const tdA = document.createElement('td');
+        tdA.className='px-6 py-4 whitespace-nowrap text-sm';
+        tdA.innerHTML = `
+          <button data-id="${nota.id}" class="btn-eliminar px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition">
+            Eliminar
+          </button>`;
+
+        tr.append(tdSel, tdN, tdF, tdT, tdP, tdD, tdO, tdA);
+        tbody.appendChild(tr);
+      });
+
+      updateSelectAllState();
+    }
+
+    /* ================= FILTROS (también para CSV fallback) ================= */
+    function filtrarNotas(baseNotas) {
+      const q = document.getElementById('search-input').value.trim().toLowerCase();
+      const start = document.getElementById('start-date').value;
+      const end   = document.getElementById('end-date').value;
+
+      return baseNotas.filter(n=>{
+        const f = n._fecha;
+        if (start && f < new Date(start+'T00:00:00')) return false;
+        if (end   && f > new Date(end+'T23:59:59'))  return false;
+
+        if (!q) return true;
+        const numero = (n._numero||'').toLowerCase();
+        const orden  = (n.orden||n.orden_compra||n.orden_venta||'').toString().toLowerCase();
+        const dest   = (n.proveedor?.nombre||n.proveedor||n.cliente?.nombre||n.cliente||'').toString().toLowerCase();
+        const prods  = (Array.isArray(n.productos)? n.productos.map(p=>p.nombre||p.producto||'').join(' ')
+                      : Array.isArray(n.items)? n.items.map(i=>i.producto?.nombre||i.producto_nombre||i.nombre||'').join(' ')
+                      : '').toLowerCase();
+        return numero.includes(q) || orden.includes(q) || dest.includes(q) || prods.includes(q);
+      });
+    }
+
+    function aplicarFiltrosSimples(baseNotas) {
+      renderNotas(filtrarNotas(baseNotas));
+    }
+
+    /* ================= EXPORT CSV ================= */
+    function exportarCSV(baseNotas) {
+      // Si hay selección, exporta selección; si no, exporta filtradas
+      const seleccionadas = baseNotas.filter(n => selectedIds.has(String(n.id)));
+      const dataset = seleccionadas.length ? seleccionadas : filtrarNotas(baseNotas);
+
+      if (!dataset.length) return alert('No hay notas para exportar.');
+      const rows = [['Numero','Fecha','Tipo','Productos','Destinatario','Orden']];
+      dataset.forEach(n=>{
+        rows.push([
+          n._numero||'-',
+          formatFechaAmigable(n._fecha||new Date()),
+          obtenerTipoNormalizado(n),
+          obtenerProductosComoLista(n).join(' | '),
+          obtenerDestinatario(n),
+          obtenerOrden(n)
+        ]);
+      });
+      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download=`notas_pedido_export_${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+
+    /* ================= EXPORT PDF (solo selección) ================= */
+    function exportarPDFSeleccion() {
+      const ids = Array.from(selectedIds);
+      if (!ids.length) {
+        alert('Selecciona al menos una nota para exportar en PDF.');
+        return;
+      }
+      const url = `/api/notas/export/pdf/?ids=${encodeURIComponent(ids.join(','))}`;
+      window.open(url, '_blank');
+    }
+
+    /* ================= INICIO + EVENTOS ================= */
+    let _notasBase = [];
+    document.addEventListener('DOMContentLoaded', async () => {
+      _notasBase = numerarPorAnio(await cargarNotas());
+      renderNotas(_notasBase);
+
+      // Filtros
+      document.getElementById('apply-filters-btn').addEventListener('click', () => aplicarFiltrosSimples(_notasBase));
+      document.getElementById('search-input').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); aplicarFiltrosSimples(_notasBase); }});
+
+      // Exportaciones
+      document.getElementById('export-csv-btn').addEventListener('click', () => exportarCSV(_notasBase));
+      document.getElementById('export-pdf-btn').addEventListener('click', () => exportarPDFSeleccion());
+
+      // Seleccionar todo (visible)
+      document.getElementById('select-all').addEventListener('change', (e) => {
+        const checked = e.target.checked;
+        document.querySelectorAll('#notas-tbody .nota-check').forEach(chk => {
+          chk.checked = checked;
+          if (checked) selectedIds.add(String(chk.value));
+          else selectedIds.delete(String(chk.value));
+        });
+        updateSelectAllState();
+      });
+
+      // Delegación: checkboxes por fila + eliminar
+      const tbody = document.getElementById('notas-tbody');
+      tbody.addEventListener('change', (e) => {
+        const chk = e.target.closest('.nota-check');
+        if (chk) {
+          if (chk.checked) selectedIds.add(String(chk.value));
+          else selectedIds.delete(String(chk.value));
+          updateSelectAllState();
+        }
+      });
+
+      // Delegación: eliminar nota
+      tbody.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-eliminar');
+        if (!btn) return;
+        const id = btn.getAttribute('data-id');
+        if (!id) return;
+
+        if (!confirm('¿Eliminar esta nota de pedido? Se revertirá su impacto en el stock.')) return;
+
+        try {
+          const res = await fetch(`/api/notas/${id}/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': csrftoken },
+          });
+          const data = await res.json();
+
+          if (!res.ok) {
+            alert('❌ No se pudo eliminar: ' + (data.error || `HTTP ${res.status}`));
+            return;
+          }
+
+          // Quitar de base + selección, renumerar y render
+          _notasBase = _notasBase.filter(n => String(n.id) !== String(id));
+          selectedIds.delete(String(id));
+          _notasBase = numerarPorAnio(_notasBase);
+          renderNotas(_notasBase);
+
+          alert('✅ Nota eliminada.');
+        } catch (err) {
+          alert('❌ Error de red: ' + err.message);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

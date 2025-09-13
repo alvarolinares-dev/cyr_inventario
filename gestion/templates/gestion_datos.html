@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C&R Logística - Gestión de Datos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div class="h-screen flex flex-col font-sans bg-gray-100">
+    <!-- Barra de navegación -->
+    <header class="bg-gray-800 text-white p-4 shadow-lg flex-shrink-0">
+      <div class="flex justify-between items-center max-w-7xl mx-auto">
+        <h1 class="text-3xl font-extrabold tracking-tight">C&R Logística</h1>
+        <nav class="flex items-center space-x-4">
+          <a href="{% url 'index' %}" class="py-2 px-4 rounded-lg font-semibold transition-colors duration-200 hover:bg-gray-700">Dashboard</a>
+          <a href="{% url 'seguimiento' %}" class="py-2 px-4 rounded-lg font-semibold transition-colors duration-200 hover:bg-gray-700">Seguimiento de pedidos</a>
+          <a href="{% url 'gestion_datos' %}" class="py-2 px-4 rounded-lg font-semibold transition-colors duration-200 hover:bg-gray-700 tab-active">Gestión de datos</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="flex-grow overflow-hidden relative">
+      <div class="absolute inset-0 p-4 overflow-y-auto">
+        <div class="max-w-7xl mx-auto space-y-8">
+          
+          <!-- Notificaciones -->
+          <div id="notification" class="hidden fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm"></div>
+          
+          <!-- Proveedores -->
+          <div class="bg-white p-8 rounded-lg shadow-xl">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Gestión de Proveedores</h2>
+            <form id="supplier-form" class="flex flex-col sm:flex-row gap-4 mb-6">
+              <input type="text" id="supplier-name-input" placeholder="Nombre del proveedor" class="flex-grow p-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200" required>
+              <button type="submit" class="bg-blue-600 text-white py-2 px-6 rounded-lg font-bold shadow-md transform transition-transform hover:scale-105 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                Añadir Proveedor
+              </button>
+            </form>
+            <ul id="suppliers-list" class="space-y-2"></ul>
+          </div>
+
+          <!-- Clientes -->
+          <div class="bg-white p-8 rounded-lg shadow-xl">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Gestión de Clientes</h2>
+            <form id="client-form" class="flex flex-col sm:flex-row gap-4 mb-6">
+              <input type="text" id="client-name-input" placeholder="Nombre del cliente" class="flex-grow p-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200" required>
+              <button type="submit" class="bg-blue-600 text-white py-2 px-6 rounded-lg font-bold shadow-md transform transition-transform hover:scale-105 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                Añadir Cliente
+              </button>
+            </form>
+            <ul id="clients-list" class="space-y-2"></ul>
+          </div>
+
+          <!-- Productos -->
+          <div class="bg-white p-8 rounded-lg shadow-xl">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-2xl font-bold text-gray-800">Gestión de Productos</h2>
+              <button id="add-product-btn" class="bg-green-600 text-white py-2 px-6 rounded-lg font-bold shadow-md transform transition-transform hover:scale-105 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50">
+                Añadir Producto
+              </button>
+            </div>
+            <p class="text-gray-600 mb-4">Haz clic en "Editar" para modificar un producto o "Añadir Producto" para crear uno nuevo.</p>
+            
+            <!-- Alta producto -->
+            <div id="add-product-form-container" class="hidden mb-8 bg-blue-50 p-6 rounded-lg border-2 border-blue-200">
+              <h3 class="text-xl font-bold text-gray-800 mb-4">Añadir Nuevo Producto</h3>
+              <p class="text-sm text-gray-600 mb-4">El código se genera automáticamente (modelo).</p>
+              <form id="add-product-form" class="space-y-4">
+                <label class="block">
+                  <span class="text-gray-700 font-semibold">Nombre del producto: <span class="text-red-500">*</span></span>
+                  <input type="text" id="add-product-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 border" required>
+                </label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label class="block">
+                    <span class="text-gray-700 font-semibold">Unidad de medida:</span>
+                    <select id="add-product-unit" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 border" required>
+                      <option value="">Seleccionar unidad...</option>
+                      <option value="Und">Unidad</option>
+                      <option value="Caja">Caja</option>
+                      <option value="Paquete">Paquete</option>
+                      <option value="Par">Par</option>
+                      <option value="Docena">Docena</option>
+                      <option value="Kg">Kilogramo</option>
+                      <option value="g">Gramo</option>
+                      <option value="Ton">Tonelada</option>
+                      <option value="L">Litro</option>
+                      <option value="mL">Mililitro</option>
+                      <option value="Gal">Galón</option>
+                      <option value="m">Metro</option>
+                      <option value="cm">Centímetro</option>
+                      <option value="mm">Milímetro</option>
+                      <option value="Rollo">Rollo</option>
+                      <option value="Pliego">Pliego</option>
+                      <option value="Set">Set</option>
+                      <option value="Kit">Kit</option>
+                    </select>
+                  </label>
+                  <label class="block">
+                    <span class="text-gray-700 font-semibold">Adquisición: <span class="text-red-500">*</span></span>
+                    <select id="add-product-adquisicion" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 border" required>
+                      <option value="Compra">Compra</option>
+                      <option value="Fabricacion">Fabricación</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label class="block">
+                    <span class="text-gray-700 font-semibold">Precio Unitario (S/.):</span>
+                    <input type="number" step="0.01" id="add-product-price" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 border" placeholder="0.00">
+                  </label>
+                  <label class="block">
+                    <span class="text-gray-700 font-semibold">Peso Unitario (kg):</span>
+                    <input type="number" step="0.01" id="add-product-weight" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 border" placeholder="0.00">
+                  </label>
+                </div>
+                <label class="block">
+                  <span class="text-gray-700 font-semibold">Proveedor: <span class="text-red-500">*</span></span>
+                  <select id="add-product-supplier" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 border" required>
+                    <option value="">Seleccionar proveedor...</option>
+                  </select>
+                </label>
+                <div class="flex justify-end space-x-4">
+                  <button type="button" id="cancel-add-btn" class="bg-gray-400 text-white py-2 px-4 rounded-lg font-bold hover:bg-gray-500 transition-colors">Cancelar</button>
+                  <button type="submit" class="bg-green-600 text-white py-2 px-4 rounded-lg font-bold hover:bg-green-700 transition-colors">Crear Producto</button>
+                </div>
+              </form>
+            </div>
+
+            <ul id="products-management-list" class="space-y-4"></ul>
+            
+            <!-- Edición producto -->
+            <div id="edit-product-form-container" class="hidden mt-8 bg-gray-50 p-6 rounded-lg">
+              <h3 class="text-xl font-bold text-gray-800 mb-4">Editar Producto</h3>
+              <form id="edit-product-form" class="space-y-4">
+                <input type="hidden" id="edit-product-id">
+                <label class="block">
+                  <span class="text-gray-700 font-semibold">Nombre del producto:</span>
+                  <input type="text" id="edit-product-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 border" required>
+                </label>
+                <label class="block">
+                  <span class="text-gray-700 font-semibold">Código del producto:</span>
+                  <input type="text" id="edit-product-code" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 border" required>
+                </label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label class="block">
+                    <span class="text-gray-700 font-semibold">Unidad de medida:</span>
+                    <select id="edit-product-unit" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 border" required>
+                      <option value="">Seleccionar unidad...</option>
+                      <option value="Und">Unidad</option>
+                      <option value="Caja">Caja</option>
+                      <option value="Paquete">Paquete</option>
+                      <option value="Par">Par</option>
+                      <option value="Docena">Docena</option>
+                      <option value="Kg">Kilogramo</option>
+                      <option value="g">Gramo</option>
+                      <option value="Ton">Tonelada</option>
+                      <option value="L">Litro</option>
+                      <option value="mL">Mililitro</option>
+                      <option value="Gal">Galón</option>
+                      <option value="m">Metro</option>
+                      <option value="cm">Centímetro</option>
+                      <option value="mm">Milímetro</option>
+                      <option value="Rollo">Rollo</option>
+                      <option value="Pliego">Pliego</option>
+                      <option value="Set">Set</option>
+                      <option value="Kit">Kit</option>
+                    </select>
+                  </label>
+                  <label class="block">
+                    <span class="text-gray-700 font-semibold">Adquisición:</span>
+                    <select id="edit-product-adquisicion" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 border" required>
+                      <option value="Fabricacion">Fabricación</option>
+                      <option value="Compra">Compra</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label class="block">
+                    <span class="text-gray-700 font-semibold">Precio Unitario (S/.):</span>
+                    <input type="number" step="0.01" id="edit-product-price" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 border" required>
+                  </label>
+                  <label class="block">
+                    <span class="text-gray-700 font-semibold">Peso Unitario (kg):</span>
+                    <input type="number" step="0.01" id="edit-product-weight" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 border" required>
+                  </label>
+                </div>
+                <label class="block">
+                  <span class="text-gray-700 font-semibold">Proveedor:</span>
+                  <select id="edit-product-supplier" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 p-2 border" required></select>
+                </label>
+                <div class="flex justify-end space-x-4">
+                  <button type="button" id="cancel-edit-btn" class="bg-gray-400 text-white py-2 px-4 rounded-lg font-bold hover:bg-gray-500 transition-colors">Cancelar</button>
+                  <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded-lg font-bold hover:bg-blue-700 transition-colors">Guardar Cambios</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+  document.addEventListener("DOMContentLoaded", async () => {
+
+    // --------- NOTIFICACIONES ---------
+    function mostrarNotificacion(mensaje, tipo = 'success') {
+      const notification = document.getElementById('notification');
+      notification.className = `fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm ${
+        tipo === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+      }`;
+      notification.textContent = mensaje;
+      notification.classList.remove('hidden');
+      setTimeout(() => notification.classList.add('hidden'), 3000);
+    }
+
+    // --------- CARGAS ---------
+    async function cargarProveedores() {
+      try {
+        const res = await fetch("/api/proveedores/");
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+
+        const list = document.getElementById("suppliers-list");
+        list.innerHTML = "";
+        data.forEach(p => {
+          const li = document.createElement("li");
+          li.className = "flex justify-between items-center bg-gray-50 p-2 rounded";
+          li.innerHTML = `
+            <span class="truncate">${p.nombre}</span>
+            <button class="btn-delete-supplier bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
+                    data-id="${p.id}" aria-label="Eliminar proveedor ${p.nombre}">
+              Eliminar
+            </button>`;
+          list.appendChild(li);
+        });
+
+        // selects
+        const supplierEdit = document.getElementById("edit-product-supplier");
+        const supplierAdd  = document.getElementById("add-product-supplier");
+        supplierEdit.innerHTML = "";
+        supplierAdd.innerHTML = '<option value="">Seleccionar proveedor...</option>';
+        data.forEach(p => {
+          const o1 = document.createElement("option");
+          o1.value = p.id; o1.textContent = p.nombre; supplierEdit.appendChild(o1);
+          const o2 = document.createElement("option");
+          o2.value = p.id; o2.textContent = p.nombre; supplierAdd.appendChild(o2);
+        });
+      } catch (e) {
+        console.error('Error cargando proveedores', e);
+        mostrarNotificacion('Error al cargar proveedores', 'error');
+      }
+    }
+
+    async function cargarClientes() {
+      try {
+        const res = await fetch("/api/clientes/");
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+
+        const list = document.getElementById("clients-list");
+        list.innerHTML = "";
+        data.forEach(c => {
+          const li = document.createElement("li");
+          li.className = "flex justify-between items-center bg-gray-50 p-2 rounded";
+          li.innerHTML = `
+            <span class="truncate">${c.nombre}</span>
+            <button class="btn-delete-client bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
+                    data-id="${c.id}" aria-label="Eliminar cliente ${c.nombre}">
+              Eliminar
+            </button>`;
+          list.appendChild(li);
+        });
+      } catch (e) {
+        console.error('Error cargando clientes', e);
+        mostrarNotificacion('Error al cargar clientes', 'error');
+      }
+    }
+
+    async function cargarProductos() {
+      try {
+        const res = await fetch("/api/productos/");
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+
+        const list = document.getElementById("products-management-list");
+        list.innerHTML = "";
+        data.forEach(prod => {
+          const li = document.createElement("li");
+          li.className = "flex justify-between items-center bg-gray-50 p-4 rounded border";
+          li.innerHTML = `
+            <div>
+              <div class="font-semibold">${prod.nombre} (${prod.codigo})</div>
+              <div class="text-sm text-gray-600">
+                Proveedor: ${prod.proveedor_nombre} | Precio: S/. ${Number(prod.precio).toFixed(2)} | Peso: ${Number(prod.peso).toFixed(2)} kg
+              </div>
+            </div>
+            <button 
+              class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition-colors font-medium btn-editar"
+              data-id="${prod.id}"
+              data-nombre="${encodeURIComponent(prod.nombre)}"
+              data-codigo="${encodeURIComponent(prod.codigo)}"
+              data-unidad="${encodeURIComponent(prod.unidad)}"
+              data-adquisicion="${encodeURIComponent(prod.adquisicion)}"
+              data-precio="${prod.precio}"
+              data-peso="${prod.peso}"
+              data-proveedor="${prod.proveedor}"
+            >
+              Editar
+            </button>
+          `;
+          list.appendChild(li);
+        });
+      } catch (e) {
+        console.error('Error cargando productos', e);
+        mostrarNotificacion('Error al cargar productos', 'error');
+      }
+    }
+
+    // Cargar todo
+    await cargarProveedores();
+    await cargarClientes();
+    await cargarProductos();
+
+    // --------- ALTA PROVEEDOR ---------
+    document.getElementById("supplier-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nombre = document.getElementById("supplier-name-input").value.trim();
+      if (!nombre) return mostrarNotificacion('El nombre del proveedor es requerido', 'error');
+
+      try {
+        const res = await fetch("/api/proveedores/", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ nombre })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById("supplier-name-input").value = "";
+          await cargarProveedores();
+          mostrarNotificacion('Proveedor añadido exitosamente');
+        } else {
+          mostrarNotificacion(data.error || 'Error al añadir proveedor', 'error');
+        }
+      } catch {
+        mostrarNotificacion('Error de conexión', 'error');
+      }
+    });
+
+    // --------- ALTA CLIENTE ---------
+    document.getElementById("client-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nombre = document.getElementById("client-name-input").value.trim();
+      if (!nombre) return mostrarNotificacion('El nombre del cliente es requerido', 'error');
+
+      try {
+        const res = await fetch("/api/clientes/", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ nombre })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById("client-name-input").value = "";
+          await cargarClientes();
+          mostrarNotificacion('Cliente añadido exitosamente');
+        } else {
+          mostrarNotificacion(data.error || 'Error al añadir cliente', 'error');
+        }
+      } catch {
+        mostrarNotificacion('Error de conexión', 'error');
+      }
+    });
+
+    // --------- ELIMINAR PROVEEDOR (delegado) ---------
+    document.getElementById("suppliers-list").addEventListener("click", async (e) => {
+      const btn = e.target.closest(".btn-delete-supplier");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const nombre = btn.getAttribute("aria-label")?.replace("Eliminar proveedor ", "") || "";
+
+      if (!confirm(`¿Eliminar proveedor "${nombre}"? Esta acción no se puede deshacer.`)) return;
+
+      btn.disabled = true;
+      btn.textContent = "Eliminando...";
+      try {
+        const res = await fetch(`/api/proveedores/${id}/`, { method: "DELETE" });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          await cargarProveedores();
+          // Podría afectar selects de productos y alta de producto
+          await cargarProductos();
+          mostrarNotificacion('Proveedor eliminado');
+        } else {
+          mostrarNotificacion(data.error || 'No se pudo eliminar el proveedor (puede estar en uso).', 'error');
+        }
+      } catch {
+        mostrarNotificacion('Error de conexión', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Eliminar";
+      }
+    });
+
+    // --------- ELIMINAR CLIENTE (delegado) ---------
+    document.getElementById("clients-list").addEventListener("click", async (e) => {
+      const btn = e.target.closest(".btn-delete-client");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const nombre = btn.getAttribute("aria-label")?.replace("Eliminar cliente ", "") || "";
+
+      if (!confirm(`¿Eliminar cliente "${nombre}"? Esta acción no se puede deshacer.`)) return;
+
+      btn.disabled = true;
+      btn.textContent = "Eliminando...";
+      try {
+        const res = await fetch(`/api/clientes/${id}/`, { method: "DELETE" });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          await cargarClientes();
+          mostrarNotificacion('Cliente eliminado');
+        } else {
+          mostrarNotificacion(data.error || 'No se pudo eliminar el cliente (puede estar en uso).', 'error');
+        }
+      } catch {
+        mostrarNotificacion('Error de conexión', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Eliminar";
+      }
+    });
+
+    // --------- EDITAR PRODUCTO (delegado) ---------
+    document.getElementById("products-management-list").addEventListener("click", (e) => {
+      const btn = e.target.closest(".btn-editar");
+      if (!btn) return;
+
+      // Decodificar y llenar form
+      document.getElementById("edit-product-form-container").classList.remove("hidden");
+      document.getElementById("edit-product-id").value        = btn.dataset.id;
+      document.getElementById("edit-product-name").value      = decodeURIComponent(btn.dataset.nombre || '');
+      document.getElementById("edit-product-code").value      = decodeURIComponent(btn.dataset.codigo || '');
+      document.getElementById("edit-product-unit").value      = decodeURIComponent(btn.dataset.unidad || '');
+      document.getElementById("edit-product-adquisicion").value = decodeURIComponent(btn.dataset.adquisicion || '');
+      document.getElementById("edit-product-price").value     = Number(btn.dataset.precio || 0);
+      document.getElementById("edit-product-weight").value    = Number(btn.dataset.peso || 0);
+      document.getElementById("edit-product-supplier").value  = btn.dataset.proveedor || '';
+
+      document.getElementById("edit-product-form-container").scrollIntoView({behavior: 'smooth'});
+    });
+
+    // --------- SUBMIT EDICIÓN PRODUCTO ---------
+    document.getElementById("edit-product-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const productoId = document.getElementById("edit-product-id").value;
+
+      const productoData = {
+        nombre: document.getElementById("edit-product-name").value.trim(),
+        codigo: document.getElementById("edit-product-code").value.trim(),
+        unidad: document.getElementById("edit-product-unit").value.trim(),
+        adquisicion: document.getElementById("edit-product-adquisicion").value,
+        precio: parseFloat(document.getElementById("edit-product-price").value),
+        peso: parseFloat(document.getElementById("edit-product-weight").value),
+        proveedor: parseInt(document.getElementById("edit-product-supplier").value)
+      };
+
+      if (!productoData.nombre || !productoData.codigo || !productoData.unidad) {
+        return mostrarNotificacion('Todos los campos son requeridos', 'error');
+      }
+      if (isNaN(productoData.precio) || isNaN(productoData.peso) || isNaN(productoData.proveedor)) {
+        return mostrarNotificacion('Los valores numéricos no son válidos', 'error');
+      }
+
+      try {
+        const res = await fetch(`/api/productos/${productoId}/editar/`, {
+          method: "PUT",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(productoData)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById("edit-product-form-container").classList.add("hidden");
+          await cargarProductos();
+          mostrarNotificacion('Producto actualizado exitosamente');
+        } else {
+          mostrarNotificacion(data.error || 'Error al actualizar producto', 'error');
+        }
+      } catch {
+        mostrarNotificacion('Error de conexión', 'error');
+      }
+    });
+
+    // --------- BOTONES VARIOS ---------
+    document.getElementById("cancel-edit-btn").addEventListener("click", () => {
+      document.getElementById("edit-product-form-container").classList.add("hidden");
+    });
+
+    document.getElementById("add-product-btn").addEventListener("click", () => {
+      document.getElementById("add-product-form-container").classList.remove("hidden");
+      document.getElementById("add-product-form-container").scrollIntoView({behavior: 'smooth'});
+    });
+
+    document.getElementById("cancel-add-btn").addEventListener("click", () => {
+      document.getElementById("add-product-form-container").classList.add("hidden");
+      document.getElementById("add-product-form").reset();
+    });
+
+    // --------- SUBMIT ALTA PRODUCTO ---------
+    document.getElementById("add-product-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nombre = document.getElementById("add-product-name").value.trim();
+      const unidad = document.getElementById("add-product-unit").value.trim() || "Und";
+      const adquisicion = document.getElementById("add-product-adquisicion").value;
+      const precio = document.getElementById("add-product-price").value || "0.00";
+      const peso = document.getElementById("add-product-weight").value || "0.00";
+      const proveedor = document.getElementById("add-product-supplier").value;
+
+      if (!nombre) return mostrarNotificacion('El nombre del producto es requerido', 'error');
+      if (!adquisicion) return mostrarNotificacion('Debe seleccionar el tipo de adquisición', 'error');
+      if (!proveedor) return mostrarNotificacion('Debe seleccionar un proveedor', 'error');
+
+      const productoData = {
+        nombre,
+        unidad,
+        adquisicion,
+        precio: parseFloat(precio),
+        peso: parseFloat(peso),
+        proveedor: parseInt(proveedor)
+      };
+
+      try {
+        const res = await fetch("/api/productos/crear/", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(productoData)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById("add-product-form-container").classList.add("hidden");
+          document.getElementById("add-product-form").reset();
+          await cargarProductos();
+          mostrarNotificacion(`Producto creado. Código: ${data.codigo}`);
+        } else {
+          mostrarNotificacion(data.error || 'Error al crear producto', 'error');
+        }
+      } catch {
+        mostrarNotificacion('Error de conexión', 'error');
+      }
+    });
+
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,448 @@
+{% load widget_tweaks %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C&R Logística</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div class="h-screen flex flex-col font-sans bg-gray-100">
+    <!-- Header -->
+    <header class="bg-gray-800 text-white p-4 shadow-lg flex-shrink-0">
+      <div class="flex justify-between items-center max-w-7xl mx-auto">
+        <h1 class="text-3xl font-extrabold">C&R Logística</h1>
+        <nav class="flex items-center space-x-4">
+          <a href="{% url 'index' %}" class="py-2 px-4 rounded-lg font-semibold hover:bg-gray-700 {% if active_tab == 'dashboard' %}bg-gray-700{% endif %}">Dashboard</a>
+          <a href="{% url 'seguimiento' %}" class="py-2 px-4 rounded-lg font-semibold hover:bg-gray-700 {% if active_tab == 'seguimiento' %}bg-gray-700{% endif %}">Seguimiento de pedidos</a>
+          <a href="{% url 'gestion_datos' %}" class="py-2 px-4 rounded-lg font-semibold hover:bg-gray-700 {% if active_tab == 'gestion' %}bg-gray-700{% endif %}">Gestión de datos</a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main class="flex-grow overflow-hidden relative">
+      <div id="dashboard-view" class="absolute inset-0 p-4 overflow-y-auto">
+        <div class="max-w-7xl mx-auto">
+          <div class="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
+            <form id="search-form" method="get" action="{% url 'index' %}" class="flex-grow max-w-lg">
+              <input id="search-products" type="text" name="q" value="{{ request.GET.q }}" placeholder="Buscar producto..."
+                    class="w-full p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 transition-all duration-200">
+            </form>
+            <button id="add-note-btn"
+                    class="bg-blue-600 text-white py-3 px-6 rounded-lg font-bold shadow-lg transform transition-transform hover:scale-105 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+              Crear nota de pedido
+            </button>
+          </div>
+
+          <!-- Modal Nueva Nota -->
+          <div id="add-note-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50">
+            <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative">
+              <button id="close-modal-btn" class="absolute top-4 right-4 text-gray-500 hover:text-gray-800 transition-colors duration-200 text-2xl">✖</button>
+              <h2 class="text-3xl font-bold mb-6 text-gray-800">Nueva Nota de Pedido</h2>
+
+              <form id="nota-form" method="POST" class="space-y-6">
+                {% csrf_token %}
+
+                <div class="flex space-x-4 mb-6">
+                  <button type="button" id="entrada-btn" class="flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 bg-green-500 text-white shadow-md hover:shadow-lg">📦 Entrada</button>
+                  <button type="button" id="salida-btn" class="flex-1 py-3 px-6 rounded-lg font-semibold transition-all duration-200 bg-gray-200 text-gray-800 shadow-md hover:shadow-lg">🚚 Salida</button>
+                </div>
+
+                <!-- IMPORTANTE: por defecto 'Entrada' (con mayúscula) -->
+                <input type="hidden" id="tipo-nota" name="tipo" value="Entrada">
+
+                <div id="dynamic-fields-container" class="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-gray-50 rounded-lg">
+                  <!-- Entrada -->
+                  <div id="entrada-fields" class="contents">
+                    <div class="space-y-2">
+                      <label for="proveedor" class="block text-sm font-medium text-gray-700">Proveedor *</label>
+                      <select id="proveedor" name="proveedor" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                        <option value="">Seleccionar proveedor...</option>
+                      </select>
+                    </div>
+                    <div class="space-y-2">
+                      <label for="orden-compra-entrada" class="block text-sm font-medium text-gray-700">Orden de Compra *</label>
+                      <input type="text" id="orden-compra-entrada" name="orden_compra" placeholder="Ej: OC-2024-001"
+                             class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                    </div>
+                  </div>
+
+                  <!-- Salida -->
+                  <div id="salida-fields" class="contents hidden">
+                    <div class="space-y-2">
+                      <label for="cliente" class="block text-sm font-medium text-gray-700">Cliente *</label>
+                      <select id="cliente" name="cliente" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Seleccionar cliente...</option>
+                      </select>
+                    </div>
+                    <div class="space-y-2">
+                      <label for="orden-compra-salida" class="block text-sm font-medium text-gray-700">Orden de Venta *</label>
+                      <input type="text" id="orden-compra-salida" name="orden_venta" placeholder="Ej: OV-2024-001"
+                             class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Productos -->
+                <div class="space-y-4">
+                  <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-semibold text-gray-800">Productos</h3>
+                    <button type="button" id="add-product-item-btn" class="bg-indigo-600 text-white py-2 px-4 rounded-lg font-semibold transition-all duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">+ Agregar producto</button>
+                  </div>
+                  <div id="product-items-container" class="space-y-4"></div>
+                </div>
+
+                <div class="text-center mt-8 pt-6 border-t border-gray-200">
+                  <button type="submit" id="submit-btn" class="w-full sm:w-auto bg-green-600 text-white py-3 px-8 rounded-lg font-bold shadow-lg transform transition-transform hover:scale-105 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50">
+                    💾 Guardar Nota de Entrada
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+          <!-- Tarjetas de productos -->
+          <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for producto in productos %}
+              <div class="producto-card bg-white p-4 rounded-lg shadow hover:shadow-lg transition"
+                  data-nombre="{{ producto.nombre|lower }}"
+                  data-codigo="{{ producto.codigo|lower }}"
+                  data-proveedor="{{ producto.proveedor.nombre|lower }}">
+                <h3 class="text-xl font-bold">{{ producto.nombre }}</h3>
+                <p class="text-gray-600">Código: {{ producto.codigo }}</p>
+                <p class="text-gray-600">U.M: {{ producto.unidad }}</p>
+                <p class="text-gray-600">Precio: S/. {{ producto.precio }}</p>
+                <p class="text-gray-800 font-semibold">Stock: {{ producto.stock|default:0 }} {{ producto.unidad }}</p>
+                <p class="text-gray-600">Proveedor: {{ producto.proveedor.nombre }}</p>
+                <div class="mt-4 flex space-x-2">
+                  <a href="{% url 'gestion_datos' %}" class="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600">Editar</a>
+                  <a href="{% url 'eliminar_producto' producto.id %}" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Eliminar</a>
+                </div>
+              </div>
+            {% empty %}
+              <p class="text-gray-600">No hay productos registrados.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // ======== Variables ========
+    const addNoteBtn = document.getElementById('add-note-btn');
+    const modal = document.getElementById('add-note-modal');
+    const closeModalBtn = document.getElementById('close-modal-btn');
+    const entradaBtn = document.getElementById('entrada-btn');
+    const salidaBtn = document.getElementById('salida-btn');
+    const tipoNotaInput = document.getElementById('tipo-nota');
+    const entradaFields = document.getElementById('entrada-fields');
+    const salidaFields = document.getElementById('salida-fields');
+    const addProductBtn = document.getElementById('add-product-item-btn');
+    const productContainer = document.getElementById('product-items-container');
+    const submitBtn = document.getElementById('submit-btn');
+    const proveedorSelect = document.getElementById('proveedor');
+    const clienteSelect = document.getElementById('cliente');
+    const notaForm = document.getElementById('nota-form');
+
+    let productCounter = 0;
+    let proveedoresData = [];
+    let clientesData = [];
+
+    // ======== Búsqueda en vivo (variables) ========
+    const searchForm = document.getElementById('search-form');
+    const searchInput = document.getElementById('search-products');
+    const grid = document.getElementById('products-grid');
+
+    // Productos disponibles (inyectados por Django)
+    const productosDisponibles = [
+      {% for producto in productos %}
+      { id: {{ producto.id }}, nombre: '{{ producto.nombre }}', codigo: '{{ producto.codigo }}', precio: {{ producto.precio }}, unidad: '{{ producto.unidad }}' },
+      {% endfor %}
+    ];
+
+    // ======== Util ========
+    function getCookie(name) {
+      const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+      return m ? m.pop() : '';
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // Debounce pequeño para el input
+    function debounce(fn, ms=250){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+
+    // ======== Búsqueda en vivo de productos (front) ========
+    function filtrarTarjetas(q) {
+      if (!grid) return;
+
+      const term = (q || '').trim().toLowerCase();
+      const cards = grid.querySelectorAll('.producto-card');
+
+      // Mensaje "sin resultados"
+      let emptyMsg = grid.querySelector('#no-results');
+      if (!emptyMsg) {
+        emptyMsg = document.createElement('p');
+        emptyMsg.id = 'no-results';
+        emptyMsg.className = 'text-gray-600 col-span-full';
+        emptyMsg.style.display = 'none';
+        emptyMsg.textContent = 'No hay productos que coincidan.';
+        grid.appendChild(emptyMsg);
+      }
+
+      let visibles = 0;
+      cards.forEach(card => {
+        // Usa data-* si existen; si no, usa el texto interno como fallback
+        const nombre = (card.dataset?.nombre || card.querySelector('h3')?.textContent || '').toLowerCase();
+        const codigo = (card.dataset?.codigo || card.querySelector('.text-gray-600')?.textContent || '').toLowerCase();
+        const proveedor = (card.dataset?.proveedor || (() => {
+          const p = [...card.querySelectorAll('p')].find(x => x.textContent.toLowerCase().includes('proveedor:'));
+          return p ? p.textContent.toLowerCase() : '';
+        })());
+
+        const match = !term || nombre.includes(term) || codigo.includes(term) || proveedor.includes(term);
+        card.style.display = match ? '' : 'none';
+        if (match) visibles++;
+      });
+
+      emptyMsg.style.display = visibles ? 'none' : '';
+    }
+
+    // Evita submit del form por Enter (que recargaría la página)
+    if (searchForm) {
+      searchForm.addEventListener('submit', (e) => e.preventDefault());
+    }
+
+    if (searchInput) {
+      searchInput.addEventListener('input', debounce(e => filtrarTarjetas(e.target.value), 200));
+      // aplica filtro inicial si vino ?q=
+      filtrarTarjetas(searchInput.value);
+    }
+
+    // ======== Submit (POST -> /api/notas/crear/) ========
+    notaForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData(notaForm);
+      const tipo = formData.get('tipo') || 'Entrada';          // 'Entrada' | 'Salida'
+      const isEntrada = tipo.toLowerCase() === 'entrada';
+
+      const errores = [];
+      if (isEntrada) {
+        if (!formData.get('proveedor')) errores.push('Debe seleccionar un proveedor');
+        if (!formData.get('orden_compra')) errores.push('Debe ingresar la orden de compra');
+      } else {
+        if (!formData.get('cliente')) errores.push('Debe seleccionar un cliente');
+        if (!formData.get('orden_venta')) errores.push('Debe ingresar la orden de venta');
+      }
+
+      // Items
+      const items = [];
+      const productItems = productContainer.querySelectorAll('.product-item');
+      productItems.forEach(item => {
+        const productSelect = item.querySelector('select[name^="producto_"]');
+        const cantidadInput = item.querySelector('input[name^="cantidad_"]');
+        const precioInput = item.querySelector('input[name^="precio_"]');
+        if (productSelect?.value && cantidadInput?.value) {
+          items.push({
+            producto: parseInt(productSelect.value, 10),
+            cantidad: Number(cantidadInput.value),
+            precio_unitario: Number(precioInput?.value || 0)
+          });
+        }
+      });
+      if (!items.length) errores.push('Debe agregar al menos un producto');
+
+      if (errores.length) {
+        alert('Errores:\n' + errores.join('\n'));
+        return;
+      }
+
+      const proveedorId = isEntrada ? parseInt(formData.get('proveedor'), 10) : null;
+      const clienteId   = !isEntrada ? parseInt(formData.get('cliente'), 10)   : null;
+
+      const payload = {
+        tipo,                                // 'Entrada' | 'Salida'
+        proveedor: proveedorId,
+        proveedor_id: proveedorId,
+        cliente: clienteId,
+        cliente_id: clienteId,
+        orden: isEntrada ? (formData.get('orden_compra') || '') : (formData.get('orden_venta') || ''),
+        orden_compra: isEntrada ? (formData.get('orden_compra') || '') : null,
+        orden_venta:  !isEntrada ? (formData.get('orden_venta')  || '') : null,
+        items
+      };
+
+      try {
+        const res = await fetch('/api/notas/crear/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert('❌ Error: ' + (data.error || 'No se pudo crear la nota'));
+          return;
+        }
+
+        alert('✅ Nota creada correctamente.');
+        notaForm.reset();
+        productContainer.innerHTML = '';
+        productCounter = 0;
+        modal.classList.add('hidden');
+        setTipoNota('entrada'); // reset
+
+        // Refrescar para ver stocks actualizados
+        window.location.reload();
+      } catch (err) {
+        alert('❌ Error de red: ' + err.message);
+      }
+    });
+
+    // ======== Carga Proveedores/Clientes ========
+    async function cargarProveedores() {
+      try {
+        const res = await fetch('/api/proveedores/');
+        if (!res.ok) throw new Error();
+        proveedoresData = await res.json();
+        proveedorSelect.innerHTML = '<option value="">Seleccionar proveedor...</option>';
+        proveedoresData.forEach(p => {
+          const o = document.createElement('option');
+          o.value = p.id; o.textContent = p.nombre;
+          proveedorSelect.appendChild(o);
+        });
+      } catch { proveedorSelect.innerHTML = '<option value="">Error al cargar proveedores</option>'; }
+    }
+    async function cargarClientes() {
+      try {
+        const res = await fetch('/api/clientes/');
+        if (!res.ok) throw new Error();
+        clientesData = await res.json();
+        clienteSelect.innerHTML = '<option value="">Seleccionar cliente...</option>';
+        clientesData.forEach(c => {
+          const o = document.createElement('option');
+          o.value = c.id; o.textContent = c.nombre;
+          clienteSelect.appendChild(o);
+        });
+      } catch { clienteSelect.innerHTML = '<option value="">Error al cargar clientes</option>'; }
+    }
+
+    // ======== Modal ========
+    addNoteBtn.addEventListener('click', async () => {
+      modal.classList.remove('hidden');
+      if (!proveedoresData.length) await cargarProveedores();
+      if (!clientesData.length) await cargarClientes();
+      if (!productContainer.children.length) addProductItem();
+    });
+    closeModalBtn.addEventListener('click', () => modal.classList.add('hidden'));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+
+    // ======== Tipo Nota (ui + hidden) ========
+    entradaBtn.addEventListener('click', () => setTipoNota('entrada'));
+    salidaBtn.addEventListener('click', () => setTipoNota('salida'));
+    function setTipoNota(tipo) {
+      tipoNotaInput.value = (tipo === 'entrada') ? 'Entrada' : 'Salida';
+
+      if (tipo === 'entrada') {
+        entradaBtn.classList.remove('bg-gray-200','text-gray-800');
+        entradaBtn.classList.add('bg-green-500','text-white');
+        salidaBtn.classList.remove('bg-blue-500','text-white');
+        salidaBtn.classList.add('bg-gray-200','text-gray-800');
+        entradaFields.classList.remove('hidden');
+        salidaFields.classList.add('hidden');
+        submitBtn.textContent = '💾 Guardar Nota de Entrada';
+        submitBtn.classList.remove('bg-blue-600','hover:bg-blue-700','focus:ring-blue-500');
+        submitBtn.classList.add('bg-green-600','hover:bg-green-700','focus:ring-green-500');
+        clienteSelect.value = '';
+      } else {
+        salidaBtn.classList.remove('bg-gray-200','text-gray-800');
+        salidaBtn.classList.add('bg-blue-500','text-white');
+        entradaBtn.classList.remove('bg-green-500','text-white');
+        entradaBtn.classList.add('bg-gray-200','text-gray-800');
+        salidaFields.classList.remove('hidden');
+        entradaFields.classList.add('hidden');
+        submitBtn.textContent = '🚚 Guardar Nota de Salida';
+        submitBtn.classList.remove('bg-green-600','hover:bg-green-700','focus:ring-green-500');
+        submitBtn.classList.add('bg-blue-600','hover:bg-blue-700','focus:ring-blue-500');
+        proveedorSelect.value = '';
+      }
+    }
+
+    // ======== Items Dinámicos ========
+    addProductBtn.addEventListener('click', addProductItem);
+    function addProductItem() {
+      productCounter++;
+      const productId = productCounter;
+      const div = document.createElement('div');
+      div.className = 'product-item p-4 border border-gray-200 rounded-lg bg-white';
+      div.setAttribute('data-product-id', productId);
+      div.innerHTML = `
+        <div class="flex justify-between items-center mb-3">
+          <h4 class="font-semibold text-gray-800">Producto #${productId}</h4>
+          <button type="button" class="remove-product text-red-500 hover:text-red-700 font-bold text-lg" onclick="removeProductItem(${productId})">🗑️</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Producto *</label>
+            <select name="producto_${productId}" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" onchange="updateProductInfo(this, ${productId})" required>
+              <option value="">Seleccionar producto...</option>
+              ${productosDisponibles.map(p => `<option value="${p.id}" data-precio="${p.precio}" data-unidad="${p.unidad}">${p.nombre} (${p.codigo})</option>`).join('')}
+            </select>
+          </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Cantidad *</label>
+            <input type="number" name="cantidad_${productId}" min="1" step="0.01" placeholder="0" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" onchange="calculateTotal(${productId})" required>
+          </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Precio Unitario</label>
+            <input type="number" name="precio_${productId}" step="0.01" placeholder="0.00" class="w-full p-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
+          </div>
+        </div>
+        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Unidad</label>
+            <input type="text" name="unidad_${productId}" placeholder="Unidad" class="w-full p-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
+          </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Total</label>
+            <input type="text" id="total_${productId}" placeholder="S/. 0.00" class="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 font-semibold" readonly>
+          </div>
+        </div>`;
+      productContainer.appendChild(div);
+    }
+    function removeProductItem(id) {
+      const el = document.querySelector(`[data-product-id="${id}"]`);
+      if (el) el.remove();
+      productContainer.querySelectorAll('.product-item h4').forEach((h, idx) => h.textContent = `Producto #${idx+1}`);
+    }
+    function updateProductInfo(selectEl, id) {
+      const opt = selectEl.selectedOptions[0];
+      const precioInput = document.querySelector(`input[name="precio_${id}"]`);
+      const unidadInput = document.querySelector(`input[name="unidad_${id}"]`);
+      const cantInput = document.querySelector(`input[name="cantidad_${id}"]`);
+      if (opt && opt.value) {
+        precioInput.value = opt.getAttribute('data-precio') || 0;
+        unidadInput.value = opt.getAttribute('data-unidad') || '';
+        if (cantInput.value) calculateTotal(id);
+      } else {
+        precioInput.value = '';
+        unidadInput.value = '';
+        document.getElementById(`total_${id}`).value = 'S/. 0.00';
+      }
+    }
+    function calculateTotal(id) {
+      const c = parseFloat(document.querySelector(`input[name="cantidad_${id}"]`).value) || 0;
+      const p = parseFloat(document.querySelector(`input[name="precio_${id}"]`).value) || 0;
+      document.getElementById(`total_${id}`).value = `S/. ${(c*p).toFixed(2)}`;
+    }
+    window.removeProductItem = removeProductItem;
+    window.updateProductInfo = updateProductInfo;
+    window.calculateTotal = calculateTotal;
+
+    // Estado inicial
+    setTipoNota('entrada');
+  </script>
+
+</body>
+</html>

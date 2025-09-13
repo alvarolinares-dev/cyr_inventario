@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+  <head><meta charset="utf-8"></head>
+  <body>
+    <div class="header">
+      <h1>{{ empresa }}</h1>
+      <div class="muted">Exportado: {{ now|date:"d/m/Y H:i" }}</div>
+    </div>
+
+    <h2>Notas de Pedido</h2>
+
+    {% if notas %}
+      {% for n in notas %}
+        <div class="nota">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <strong># Nota:</strong> {{ n.id }}<br>
+              <strong>Fecha:</strong> {{ n.fecha|date:"d/m/Y H:i" }}<br>
+              <strong>Orden:</strong> {{ n.orden|default:"-" }}
+            </div>
+            <div>
+              {% if n.tipo|lower == 'entrada' %}
+                <span class="badge entrada">Entrada</span>
+              {% elif n.tipo|lower == 'salida' %}
+                <span class="badge salida">Salida</span>
+              {% else %}
+                <span class="badge">{{ n.tipo }}</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <div style="margin-top:8px;">
+            <strong>Destinatario:</strong>
+            {% if n.proveedor %}Proveedor: {{ n.proveedor }}
+            {% elif n.cliente %}Cliente: {{ n.cliente }}
+            {% else %}-{% endif %}
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width:70%;">Producto</th>
+                <th style="width:30%;">Cantidad</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for it in n.items %}
+              <tr>
+                <td>{{ it.producto }}</td>
+                <td>{{ it.cantidad }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="2" class="muted">Sin items</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="muted">No hay notas para mostrar.</p>
+    {% endif %}
+  </body>
+</html>
