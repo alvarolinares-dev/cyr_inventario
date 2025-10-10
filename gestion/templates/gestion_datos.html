@@ -53,6 +53,14 @@
 
           <!-- Productos -->
           <div class="bg-white p-8 rounded-lg shadow-xl">
+            <!-- Buscador -->
+            <div class="mb-4 max-w-2xl">
+              <label for="productos-search" class="sr-only">Buscar productos</label>
+              <input id="productos-search" type="search" placeholder="Buscar producto por nombre, código o proveedor..."
+                     class="w-full p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                     aria-label="Buscar productos">
+            </div>
+
             <div class="flex justify-between items-center mb-4">
               <h2 class="text-2xl font-bold text-gray-800">Gestión de Productos</h2>
               <button id="add-product-btn" class="bg-green-600 text-white py-2 px-6 rounded-lg font-bold shadow-md transform transition-transform hover:scale-105 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50">
@@ -200,130 +208,273 @@
     </main>
   </div>
 
-  <script>
-  document.addEventListener("DOMContentLoaded", async () => {
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
 
-    // --------- NOTIFICACIONES ---------
-    function mostrarNotificacion(mensaje, tipo = 'success') {
-      const notification = document.getElementById('notification');
-      notification.className = `fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm ${
-        tipo === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-      }`;
-      notification.textContent = mensaje;
-      notification.classList.remove('hidden');
-      setTimeout(() => notification.classList.add('hidden'), 3000);
-    }
+  // --------- NOTIFICACIONES ---------
+  function mostrarNotificacion(mensaje, tipo = 'success') {
+    const notification = document.getElementById('notification');
+    notification.className = `fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm ${
+      tipo === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+    }`;
+    notification.textContent = mensaje;
+    notification.classList.remove('hidden');
+    setTimeout(() => notification.classList.add('hidden'), 3000);
+  }
 
-    // --------- CARGAS ---------
-    async function cargarProveedores() {
-      try {
-        const res = await fetch("/api/proveedores/");
-        if (!res.ok) throw new Error();
-        const data = await res.json();
+  // --------- CARGAS ---------
+  async function cargarProveedores() {
+    try {
+      const res = await fetch("/api/proveedores/");
+      if (!res.ok) throw new Error();
+      const data = await res.json();
 
-        const list = document.getElementById("suppliers-list");
-        list.innerHTML = "";
-        data.forEach(p => {
-          const li = document.createElement("li");
-          li.className = "flex justify-between items-center bg-gray-50 p-2 rounded";
-          li.innerHTML = `
-            <span class="truncate">${p.nombre}</span>
-            <button class="btn-delete-supplier bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
-                    data-id="${p.id}" aria-label="Eliminar proveedor ${p.nombre}">
-              Eliminar
-            </button>`;
-          list.appendChild(li);
-        });
+      const list = document.getElementById("suppliers-list");
+      list.innerHTML = "";
+      data.forEach(p => {
+        const li = document.createElement("li");
+        li.className = "flex justify-between items-center bg-gray-50 p-2 rounded";
+        li.innerHTML = `
+          <span class="truncate">${p.nombre}</span>
+          <button class="btn-delete-supplier bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
+                  data-id="${p.id}" aria-label="Eliminar proveedor ${p.nombre}">
+            Eliminar
+          </button>`;
+        list.appendChild(li);
+      });
 
-        // selects
-        const supplierEdit = document.getElementById("edit-product-supplier");
-        const supplierAdd  = document.getElementById("add-product-supplier");
-        supplierEdit.innerHTML = "";
-        supplierAdd.innerHTML = '<option value="">Seleccionar proveedor...</option>';
-        data.forEach(p => {
+      // selects
+      const supplierEdit = document.getElementById("edit-product-supplier");
+      const supplierAdd  = document.getElementById("add-product-supplier");
+      if (supplierEdit) supplierEdit.innerHTML = "";
+      if (supplierAdd) supplierAdd.innerHTML = '<option value="">Seleccionar proveedor...</option>';
+      data.forEach(p => {
+        if (supplierEdit) {
           const o1 = document.createElement("option");
           o1.value = p.id; o1.textContent = p.nombre; supplierEdit.appendChild(o1);
+        }
+        if (supplierAdd) {
           const o2 = document.createElement("option");
           o2.value = p.id; o2.textContent = p.nombre; supplierAdd.appendChild(o2);
-        });
-      } catch (e) {
-        console.error('Error cargando proveedores', e);
-        mostrarNotificacion('Error al cargar proveedores', 'error');
-      }
+        }
+      });
+    } catch (e) {
+      console.error('Error cargando proveedores', e);
+      mostrarNotificacion('Error al cargar proveedores', 'error');
     }
+  }
 
-    async function cargarClientes() {
-      try {
-        const res = await fetch("/api/clientes/");
-        if (!res.ok) throw new Error();
-        const data = await res.json();
+  async function cargarClientes() {
+    try {
+      const res = await fetch("/api/clientes/");
+      if (!res.ok) throw new Error();
+      const data = await res.json();
 
-        const list = document.getElementById("clients-list");
-        list.innerHTML = "";
-        data.forEach(c => {
-          const li = document.createElement("li");
-          li.className = "flex justify-between items-center bg-gray-50 p-2 rounded";
-          li.innerHTML = `
-            <span class="truncate">${c.nombre}</span>
-            <button class="btn-delete-client bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
-                    data-id="${c.id}" aria-label="Eliminar cliente ${c.nombre}">
-              Eliminar
-            </button>`;
-          list.appendChild(li);
-        });
-      } catch (e) {
-        console.error('Error cargando clientes', e);
-        mostrarNotificacion('Error al cargar clientes', 'error');
-      }
+      const list = document.getElementById("clients-list");
+      list.innerHTML = "";
+      data.forEach(c => {
+        const li = document.createElement("li");
+        li.className = "flex justify-between items-center bg-gray-50 p-2 rounded";
+        li.innerHTML = `
+          <span class="truncate">${c.nombre}</span>
+          <button class="btn-delete-client bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
+                  data-id="${c.id}" aria-label="Eliminar cliente ${c.nombre}">
+            Eliminar
+          </button>`;
+        list.appendChild(li);
+      });
+    } catch (e) {
+      console.error('Error cargando clientes', e);
+      mostrarNotificacion('Error al cargar clientes', 'error');
     }
+  }
 
-    async function cargarProductos() {
-      try {
-        const res = await fetch("/api/productos/");
-        if (!res.ok) throw new Error();
-        const data = await res.json();
+  // -------------------------
+  // CACHES y RENDER (parche)
+  // -------------------------
+  // - productosFullCache: lista completa inicial (fuente de verdad)
+  // - productosCache: lista que actualmente se muestra (puede venir de server-side search)
+  let productosFullCache = [];
+  let productosCache = [];
 
-        const list = document.getElementById("products-management-list");
-        list.innerHTML = "";
-        data.forEach(prod => {
-          const li = document.createElement("li");
-          li.className = "flex justify-between items-center bg-gray-50 p-4 rounded border";
-          li.innerHTML = `
-            <div>
-              <div class="font-semibold">${prod.nombre} (${prod.codigo})</div>
-              <div class="text-sm text-gray-600">
-                Proveedor: ${prod.proveedor_nombre} | Precio: S/. ${Number(prod.precio).toFixed(2)} | Peso: ${Number(prod.peso).toFixed(2)} kg
-              </div>
-            </div>
-            <button 
-              class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition-colors font-medium btn-editar"
-              data-id="${prod.id}"
-              data-nombre="${encodeURIComponent(prod.nombre)}"
-              data-codigo="${encodeURIComponent(prod.codigo)}"
-              data-unidad="${encodeURIComponent(prod.unidad)}"
-              data-adquisicion="${encodeURIComponent(prod.adquisicion)}"
-              data-precio="${prod.precio}"
-              data-peso="${prod.peso}"
-              data-proveedor="${prod.proveedor}"
-            >
-              Editar
-            </button>
-          `;
-          list.appendChild(li);
-        });
-      } catch (e) {
-        console.error('Error cargando productos', e);
-        mostrarNotificacion('Error al cargar productos', 'error');
+  function renderProductosLista(items) {
+    const list = document.getElementById("products-management-list");
+    list.innerHTML = "";
+    items.forEach(prod => {
+      const id = prod.id ?? '';
+      const nombre = prod.nombre ?? '(sin nombre)';
+      const codigo = prod.codigo ?? '';
+      const proveedor_nombre = prod.proveedor_nombre ?? (typeof prod.proveedor === 'object' && prod.proveedor ? (prod.proveedor.nombre ?? '—') : (prod.proveedor || '—'));
+      const precioNum = Number(prod.precio || 0);
+      const pesoNum = Number(prod.peso || 0);
+      const unidad = prod.unidad ?? '';
+      const adquisicion = prod.adquisicion ?? '';
+      const proveedorId = (typeof prod.proveedor === 'object' && prod.proveedor !== null) ? (prod.proveedor.id ?? '') : (prod.proveedor ?? '');
+
+      const li = document.createElement("li");
+      li.className = "flex justify-between items-center bg-gray-50 p-4 rounded border";
+      li.innerHTML = `
+        <div>
+          <div class="font-semibold">${nombre} (${codigo})</div>
+          <div class="text-sm text-gray-600">
+            Proveedor: ${proveedor_nombre} | Precio: S/. ${isNaN(precioNum) ? '0.00' : precioNum.toFixed(2)} | Peso: ${isNaN(pesoNum) ? '0.00' : pesoNum.toFixed(2)} kg
+          </div>
+        </div>
+        <button 
+          class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition-colors font-medium btn-editar"
+          data-id="${id}"
+          data-nombre="${encodeURIComponent(nombre)}"
+          data-codigo="${encodeURIComponent(codigo)}"
+          data-unidad="${encodeURIComponent(unidad)}"
+          data-adquisicion="${encodeURIComponent(adquisicion)}"
+          data-precio="${precioNum}"
+          data-peso="${pesoNum}"
+          data-proveedor="${proveedorId}"
+        >
+          Editar
+        </button>
+      `;
+      list.appendChild(li);
+    });
+  }
+
+  // Cargar productos inicial y llenar FULL cache + cache mostrada
+  async function cargarProductos() {
+    try {
+      const res = await fetch("/api/productos/?page=1&page_size=200", { credentials: "same-origin" });
+      console.log("GET /api/productos/ ->", res.status, res.statusText);
+      const contentType = res.headers.get('content-type') || '';
+      console.log("Content-Type:", contentType);
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        console.error("Respuesta no OK:", res.status, txt);
+        mostrarNotificacion(`Error al obtener productos: ${res.status}`, 'error');
+        return;
       }
+
+      if (!contentType.includes('application/json')) {
+        const txt = await res.text().catch(() => '');
+        console.error("Esperaba JSON pero recibí:", txt);
+        mostrarNotificacion('La API devolvió un formato inesperado (no JSON). Revisa consola.', 'error');
+        return;
+      }
+
+      const payload = await res.json();
+      let items = [];
+      if (Array.isArray(payload)) items = payload;
+      else if (payload && Array.isArray(payload.results)) items = payload.results;
+      else {
+        console.error("Formato de respuesta inesperado:", payload);
+        mostrarNotificacion('Formato de datos inesperado (ver consola).', 'error');
+        return;
+      }
+
+      // Guardar en full cache (origen) y en cache mostrada
+      productosFullCache = items.slice();
+      productosCache = items.slice();
+      renderProductosLista(productosCache);
+
+    } catch (e) {
+      console.error('Error cargando productos', e);
+      mostrarNotificacion('Error al cargar productos (ver consola)', 'error');
     }
+  }
 
-    // Cargar todo
-    await cargarProveedores();
-    await cargarClientes();
-    await cargarProductos();
+  // Búsqueda server-side: no sobrescribe productosFullCache, solo actualiza la vista (productosCache)
+  async function buscarProductosServidor(q) {
+    try {
+      const url = `/api/productos/?q=${encodeURIComponent(q)}&page=1&page_size=200`;
+      const res = await fetch(url, { credentials: "same-origin" });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        console.error("Error GET productos:", res.status, txt);
+        mostrarNotificacion('Error al obtener productos', 'error');
+        return;
+      }
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        console.error("GET productos devolvió no-json:", await res.text().catch(()=>'')); 
+        mostrarNotificacion('La API devolvió un formato inesperado', 'error');
+        return;
+      }
+      const payload = await res.json();
+      let items = [];
+      if (Array.isArray(payload)) items = payload;
+      else if (payload && Array.isArray(payload.results)) items = payload.results;
+      else {
+        console.error("Formato de productos inesperado:", payload);
+        mostrarNotificacion('Formato de datos inesperado (ver consola).', 'error');
+        return;
+      }
 
-    // --------- ALTA PROVEEDOR ---------
-    document.getElementById("supplier-form").addEventListener("submit", async (e) => {
+      productosCache = items.slice();
+      renderProductosLista(productosCache);
+    } catch (e) {
+      console.error('Error buscando productos (server)', e);
+      mostrarNotificacion('Error al buscar productos (ver consola)', 'error');
+    }
+  }
+
+  // Filtrado local siempre usa la FULL cache (source of truth).
+  function filtrarProductosLocal(term) {
+    const q = (term || '').trim().toLowerCase();
+    if (!q) {
+      // Restaurar vista completa
+      productosCache = productosFullCache.slice();
+      renderProductosLista(productosCache);
+      return;
+    }
+    const filtrados = productosFullCache.filter(p => {
+      const nombre = (p.nombre || '').toString().toLowerCase();
+      const codigo = (p.codigo || '').toString().toLowerCase();
+      const proveedor_nombre = (p.proveedor_nombre || (typeof p.proveedor === 'object' && p.proveedor ? p.proveedor.nombre : '') || '').toString().toLowerCase();
+      return nombre.includes(q) || codigo.includes(q) || proveedor_nombre.includes(q);
+    });
+    productosCache = filtrados;
+    renderProductosLista(productosCache);
+  }
+
+  // Utils
+  function debounce(fn, ms = 300) {
+    let t;
+    return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  }
+
+  // Buscador: filtra localmente y si >=3 chars consulta al servidor (sin sobrescribir la FULL cache)
+  const searchInput = document.getElementById('productos-search');
+  const handleSearch = debounce(async (ev) => {
+    const term = (ev.target ? ev.target.value : ev).trim();
+
+    // Filtrado local inmediato sobre la lista completa
+    filtrarProductosLocal(term);
+
+    // Si el término tiene 3 o más caracteres, consulta al servidor
+    if (term.length >= 3) {
+      await buscarProductosServidor(term);
+    }
+  }, 300);
+
+  if (searchInput) {
+    searchInput.addEventListener('input', handleSearch);
+    searchInput.addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        // Forzar búsqueda al servidor
+        (async () => { await buscarProductosServidor(searchInput.value.trim()); })();
+      }
+    });
+  }
+
+  // --------- INICIALIZACIÓN (cargas) ---------
+  await cargarProveedores();
+  await cargarClientes();
+  await cargarProductos();
+
+  // --------- ALTA PROVEEDOR ---------
+  const supplierForm = document.getElementById("supplier-form");
+  if (supplierForm) {
+    supplierForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const nombre = document.getElementById("supplier-name-input").value.trim();
       if (!nombre) return mostrarNotificacion('El nombre del proveedor es requerido', 'error');
@@ -346,9 +497,12 @@
         mostrarNotificacion('Error de conexión', 'error');
       }
     });
+  }
 
-    // --------- ALTA CLIENTE ---------
-    document.getElementById("client-form").addEventListener("submit", async (e) => {
+  // --------- ALTA CLIENTE ---------
+  const clientForm = document.getElementById("client-form");
+  if (clientForm) {
+    clientForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const nombre = document.getElementById("client-name-input").value.trim();
       if (!nombre) return mostrarNotificacion('El nombre del cliente es requerido', 'error');
@@ -371,9 +525,12 @@
         mostrarNotificacion('Error de conexión', 'error');
       }
     });
+  }
 
-    // --------- ELIMINAR PROVEEDOR (delegado) ---------
-    document.getElementById("suppliers-list").addEventListener("click", async (e) => {
+  // --------- ELIMINAR PROVEEDOR (delegado) ---------
+  const suppliersList = document.getElementById("suppliers-list");
+  if (suppliersList) {
+    suppliersList.addEventListener("click", async (e) => {
       const btn = e.target.closest(".btn-delete-supplier");
       if (!btn) return;
       const id = btn.dataset.id;
@@ -401,9 +558,12 @@
         btn.textContent = "Eliminar";
       }
     });
+  }
 
-    // --------- ELIMINAR CLIENTE (delegado) ---------
-    document.getElementById("clients-list").addEventListener("click", async (e) => {
+  // --------- ELIMINAR CLIENTE (delegado) ---------
+  const clientsList = document.getElementById("clients-list");
+  if (clientsList) {
+    clientsList.addEventListener("click", async (e) => {
       const btn = e.target.closest(".btn-delete-client");
       if (!btn) return;
       const id = btn.dataset.id;
@@ -429,14 +589,18 @@
         btn.textContent = "Eliminar";
       }
     });
+  }
 
-    // --------- EDITAR PRODUCTO (delegado) ---------
-    document.getElementById("products-management-list").addEventListener("click", (e) => {
+  // --------- EDITAR PRODUCTO (delegado) ---------
+  const productsManagementList = document.getElementById("products-management-list");
+  if (productsManagementList) {
+    productsManagementList.addEventListener("click", (e) => {
       const btn = e.target.closest(".btn-editar");
       if (!btn) return;
 
       // Decodificar y llenar form
-      document.getElementById("edit-product-form-container").classList.remove("hidden");
+      const editFormContainer = document.getElementById("edit-product-form-container");
+      if (editFormContainer) editFormContainer.classList.remove("hidden");
       document.getElementById("edit-product-id").value        = btn.dataset.id;
       document.getElementById("edit-product-name").value      = decodeURIComponent(btn.dataset.nombre || '');
       document.getElementById("edit-product-code").value      = decodeURIComponent(btn.dataset.codigo || '');
@@ -446,11 +610,14 @@
       document.getElementById("edit-product-weight").value    = Number(btn.dataset.peso || 0);
       document.getElementById("edit-product-supplier").value  = btn.dataset.proveedor || '';
 
-      document.getElementById("edit-product-form-container").scrollIntoView({behavior: 'smooth'});
+      if (editFormContainer) editFormContainer.scrollIntoView({behavior: 'smooth'});
     });
+  }
 
-    // --------- SUBMIT EDICIÓN PRODUCTO ---------
-    document.getElementById("edit-product-form").addEventListener("submit", async (e) => {
+  // --------- SUBMIT EDICIÓN PRODUCTO ---------
+  const editProductForm = document.getElementById("edit-product-form");
+  if (editProductForm) {
+    editProductForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const productoId = document.getElementById("edit-product-id").value;
 
@@ -479,7 +646,8 @@
         });
         const data = await res.json();
         if (res.ok) {
-          document.getElementById("edit-product-form-container").classList.add("hidden");
+          const editFormContainer = document.getElementById("edit-product-form-container");
+          if (editFormContainer) editFormContainer.classList.add("hidden");
           await cargarProductos();
           mostrarNotificacion('Producto actualizado exitosamente');
         } else {
@@ -489,24 +657,36 @@
         mostrarNotificacion('Error de conexión', 'error');
       }
     });
+  }
 
-    // --------- BOTONES VARIOS ---------
-    document.getElementById("cancel-edit-btn").addEventListener("click", () => {
-      document.getElementById("edit-product-form-container").classList.add("hidden");
-    });
+  // --------- BOTONES VARIOS ---------
+  const cancelEditBtn = document.getElementById("cancel-edit-btn");
+  if (cancelEditBtn) cancelEditBtn.addEventListener("click", () => {
+    const editFormContainer = document.getElementById("edit-product-form-container");
+    if (editFormContainer) editFormContainer.classList.add("hidden");
+  });
 
-    document.getElementById("add-product-btn").addEventListener("click", () => {
-      document.getElementById("add-product-form-container").classList.remove("hidden");
-      document.getElementById("add-product-form-container").scrollIntoView({behavior: 'smooth'});
-    });
+  const addProductBtn = document.getElementById("add-product-btn");
+  if (addProductBtn) addProductBtn.addEventListener("click", () => {
+    const addForm = document.getElementById("add-product-form-container");
+    if (addForm) {
+      addForm.classList.remove("hidden");
+      addForm.scrollIntoView({behavior: 'smooth'});
+    }
+  });
 
-    document.getElementById("cancel-add-btn").addEventListener("click", () => {
-      document.getElementById("add-product-form-container").classList.add("hidden");
-      document.getElementById("add-product-form").reset();
-    });
+  const cancelAddBtn = document.getElementById("cancel-add-btn");
+  if (cancelAddBtn) cancelAddBtn.addEventListener("click", () => {
+    const addForm = document.getElementById("add-product-form-container");
+    if (addForm) addForm.classList.add("hidden");
+    const addFormEl = document.getElementById("add-product-form");
+    if (addFormEl) addFormEl.reset();
+  });
 
-    // --------- SUBMIT ALTA PRODUCTO ---------
-    document.getElementById("add-product-form").addEventListener("submit", async (e) => {
+  // --------- SUBMIT ALTA PRODUCTO ---------
+  const addProductForm = document.getElementById("add-product-form");
+  if (addProductForm) {
+    addProductForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const nombre = document.getElementById("add-product-name").value.trim();
       const unidad = document.getElementById("add-product-unit").value.trim() || "Und";
@@ -523,8 +703,8 @@
         nombre,
         unidad,
         adquisicion,
-        precio: parseFloat(precio),
-        peso: parseFloat(peso),
+        precio: parseFloat(parseFloat(precio).toFixed(2)),
+        peso: parseFloat(parseFloat(peso).toFixed(2)),
         proveedor: parseInt(proveedor)
       };
 
@@ -536,8 +716,9 @@
         });
         const data = await res.json();
         if (res.ok) {
-          document.getElementById("add-product-form-container").classList.add("hidden");
-          document.getElementById("add-product-form").reset();
+          const addForm = document.getElementById("add-product-form-container");
+          if (addForm) addForm.classList.add("hidden");
+          addProductForm.reset();
           await cargarProductos();
           mostrarNotificacion(`Producto creado. Código: ${data.codigo}`);
         } else {
@@ -547,9 +728,11 @@
         mostrarNotificacion('Error de conexión', 'error');
       }
     });
+  }
 
-  });
+});
 </script>
+
 
 </body>
 </html>

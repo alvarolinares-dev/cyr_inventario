@@ -146,19 +146,14 @@
     const clienteSelect = document.getElementById('cliente');
     const notaForm = document.getElementById('nota-form');
 
-    let productCounter = 0;
+    let productBaseCounter = 0; // usado solo para generar parte del uid (no la numeración visible)
     let proveedoresData = [];
     let clientesData = [];
-
-    // ======== Búsqueda en vivo (variables) ========
-    const searchForm = document.getElementById('search-form');
-    const searchInput = document.getElementById('search-products');
-    const grid = document.getElementById('products-grid');
 
     // Productos disponibles (inyectados por Django)
     const productosDisponibles = [
       {% for producto in productos %}
-      { id: {{ producto.id }}, nombre: '{{ producto.nombre }}', codigo: '{{ producto.codigo }}', precio: {{ producto.precio }}, unidad: '{{ producto.unidad }}' },
+      { id: {{ producto.id }}, nombre: '{{ producto.nombre|escapejs }}', codigo: '{{ producto.codigo|escapejs }}', precio: {{ producto.precio }}, unidad: '{{ producto.unidad|escapejs }}' },
       {% endfor %}
     ];
 
@@ -169,136 +164,7 @@
     }
     const csrftoken = getCookie('csrftoken');
 
-    // Debounce pequeño para el input
     function debounce(fn, ms=250){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
-
-    // ======== Búsqueda en vivo de productos (front) ========
-    function filtrarTarjetas(q) {
-      if (!grid) return;
-
-      const term = (q || '').trim().toLowerCase();
-      const cards = grid.querySelectorAll('.producto-card');
-
-      // Mensaje "sin resultados"
-      let emptyMsg = grid.querySelector('#no-results');
-      if (!emptyMsg) {
-        emptyMsg = document.createElement('p');
-        emptyMsg.id = 'no-results';
-        emptyMsg.className = 'text-gray-600 col-span-full';
-        emptyMsg.style.display = 'none';
-        emptyMsg.textContent = 'No hay productos que coincidan.';
-        grid.appendChild(emptyMsg);
-      }
-
-      let visibles = 0;
-      cards.forEach(card => {
-        // Usa data-* si existen; si no, usa el texto interno como fallback
-        const nombre = (card.dataset?.nombre || card.querySelector('h3')?.textContent || '').toLowerCase();
-        const codigo = (card.dataset?.codigo || card.querySelector('.text-gray-600')?.textContent || '').toLowerCase();
-        const proveedor = (card.dataset?.proveedor || (() => {
-          const p = [...card.querySelectorAll('p')].find(x => x.textContent.toLowerCase().includes('proveedor:'));
-          return p ? p.textContent.toLowerCase() : '';
-        })());
-
-        const match = !term || nombre.includes(term) || codigo.includes(term) || proveedor.includes(term);
-        card.style.display = match ? '' : 'none';
-        if (match) visibles++;
-      });
-
-      emptyMsg.style.display = visibles ? 'none' : '';
-    }
-
-    // Evita submit del form por Enter (que recargaría la página)
-    if (searchForm) {
-      searchForm.addEventListener('submit', (e) => e.preventDefault());
-    }
-
-    if (searchInput) {
-      searchInput.addEventListener('input', debounce(e => filtrarTarjetas(e.target.value), 200));
-      // aplica filtro inicial si vino ?q=
-      filtrarTarjetas(searchInput.value);
-    }
-
-    // ======== Submit (POST -> /api/notas/crear/) ========
-    notaForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      const formData = new FormData(notaForm);
-      const tipo = formData.get('tipo') || 'Entrada';          // 'Entrada' | 'Salida'
-      const isEntrada = tipo.toLowerCase() === 'entrada';
-
-      const errores = [];
-      if (isEntrada) {
-        if (!formData.get('proveedor')) errores.push('Debe seleccionar un proveedor');
-        if (!formData.get('orden_compra')) errores.push('Debe ingresar la orden de compra');
-      } else {
-        if (!formData.get('cliente')) errores.push('Debe seleccionar un cliente');
-        if (!formData.get('orden_venta')) errores.push('Debe ingresar la orden de venta');
-      }
-
-      // Items
-      const items = [];
-      const productItems = productContainer.querySelectorAll('.product-item');
-      productItems.forEach(item => {
-        const productSelect = item.querySelector('select[name^="producto_"]');
-        const cantidadInput = item.querySelector('input[name^="cantidad_"]');
-        const precioInput = item.querySelector('input[name^="precio_"]');
-        if (productSelect?.value && cantidadInput?.value) {
-          items.push({
-            producto: parseInt(productSelect.value, 10),
-            cantidad: Number(cantidadInput.value),
-            precio_unitario: Number(precioInput?.value || 0)
-          });
-        }
-      });
-      if (!items.length) errores.push('Debe agregar al menos un producto');
-
-      if (errores.length) {
-        alert('Errores:\n' + errores.join('\n'));
-        return;
-      }
-
-      const proveedorId = isEntrada ? parseInt(formData.get('proveedor'), 10) : null;
-      const clienteId   = !isEntrada ? parseInt(formData.get('cliente'), 10)   : null;
-
-      const payload = {
-        tipo,                                // 'Entrada' | 'Salida'
-        proveedor: proveedorId,
-        proveedor_id: proveedorId,
-        cliente: clienteId,
-        cliente_id: clienteId,
-        orden: isEntrada ? (formData.get('orden_compra') || '') : (formData.get('orden_venta') || ''),
-        orden_compra: isEntrada ? (formData.get('orden_compra') || '') : null,
-        orden_venta:  !isEntrada ? (formData.get('orden_venta')  || '') : null,
-        items
-      };
-
-      try {
-        const res = await fetch('/api/notas/crear/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-
-        if (!res.ok) {
-          alert('❌ Error: ' + (data.error || 'No se pudo crear la nota'));
-          return;
-        }
-
-        alert('✅ Nota creada correctamente.');
-        notaForm.reset();
-        productContainer.innerHTML = '';
-        productCounter = 0;
-        modal.classList.add('hidden');
-        setTipoNota('entrada'); // reset
-
-        // Refrescar para ver stocks actualizados
-        window.location.reload();
-      } catch (err) {
-        alert('❌ Error de red: ' + err.message);
-      }
-    });
 
     // ======== Carga Proveedores/Clientes ========
     async function cargarProveedores() {
@@ -312,7 +178,9 @@
           o.value = p.id; o.textContent = p.nombre;
           proveedorSelect.appendChild(o);
         });
-      } catch { proveedorSelect.innerHTML = '<option value="">Error al cargar proveedores</option>'; }
+      } catch {
+        proveedorSelect.innerHTML = '<option value="">Error al cargar proveedores</option>';
+      }
     }
     async function cargarClientes() {
       try {
@@ -325,7 +193,9 @@
           o.value = c.id; o.textContent = c.nombre;
           clienteSelect.appendChild(o);
         });
-      } catch { clienteSelect.innerHTML = '<option value="">Error al cargar clientes</option>'; }
+      } catch {
+        clienteSelect.innerHTML = '<option value="">Error al cargar clientes</option>';
+      }
     }
 
     // ======== Modal ========
@@ -333,6 +203,7 @@
       modal.classList.remove('hidden');
       if (!proveedoresData.length) await cargarProveedores();
       if (!clientesData.length) await cargarClientes();
+      // Si no hay items, agrega uno vacío
       if (!productContainer.children.length) addProductItem();
     });
     closeModalBtn.addEventListener('click', () => modal.classList.add('hidden'));
@@ -369,80 +240,215 @@
       }
     }
 
-    // ======== Items Dinámicos ========
+    // ======== Items Dinámicos mejorados ========
     addProductBtn.addEventListener('click', addProductItem);
+
+    function createOptionsHtml() {
+      // Escapado ya hecho en el contexto Django con escapejs en productosDisponibles
+      return '<option value="">Seleccionar producto...</option>' +
+        productosDisponibles.map(p => `<option value="${p.id}" data-precio="${p.precio}" data-unidad="${p.unidad}">${p.nombre} (${p.codigo})</option>`).join('');
+    }
+
     function addProductItem() {
-      productCounter++;
-      const productId = productCounter;
+      // uid único (evita que el navegador 'autocompletar' reutilice valores antiguos)
+      productBaseCounter++;
+      const uid = `${Date.now()}_${productBaseCounter}`;
+
+      // numeración visible en base a items actuales (+1)
+      const visibleIndex = productContainer.children.length + 1;
+
       const div = document.createElement('div');
       div.className = 'product-item p-4 border border-gray-200 rounded-lg bg-white';
-      div.setAttribute('data-product-id', productId);
+      div.setAttribute('data-uid', uid);
       div.innerHTML = `
         <div class="flex justify-between items-center mb-3">
-          <h4 class="font-semibold text-gray-800">Producto #${productId}</h4>
-          <button type="button" class="remove-product text-red-500 hover:text-red-700 font-bold text-lg" onclick="removeProductItem(${productId})">🗑️</button>
+          <h4 class="font-semibold text-gray-800">Producto #${visibleIndex}</h4>
+          <button type="button" class="remove-product text-red-500 hover:text-red-700 font-bold text-lg" data-uid="${uid}">🗑️</button>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="space-y-2">
             <label class="block text-sm font-medium text-gray-700">Producto *</label>
-            <select name="producto_${productId}" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" onchange="updateProductInfo(this, ${productId})" required>
-              <option value="">Seleccionar producto...</option>
-              ${productosDisponibles.map(p => `<option value="${p.id}" data-precio="${p.precio}" data-unidad="${p.unidad}">${p.nombre} (${p.codigo})</option>`).join('')}
+            <select name="producto_${uid}" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 producto-select" required>
+              ${createOptionsHtml()}
             </select>
           </div>
           <div class="space-y-2">
             <label class="block text-sm font-medium text-gray-700">Cantidad *</label>
-            <input type="number" name="cantidad_${productId}" min="1" step="0.01" placeholder="0" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" onchange="calculateTotal(${productId})" required>
+            <input type="number" name="cantidad_${uid}" min="1" step="0.01" placeholder="0" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cantidad-input" required>
           </div>
           <div class="space-y-2">
             <label class="block text-sm font-medium text-gray-700">Precio Unitario</label>
-            <input type="number" name="precio_${productId}" step="0.01" placeholder="0.00" class="w-full p-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
+            <input type="number" name="precio_${uid}" step="0.01" placeholder="0.00" class="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 precio-input" readonly>
           </div>
         </div>
         <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="space-y-2">
             <label class="block text-sm font-medium text-gray-700">Unidad</label>
-            <input type="text" name="unidad_${productId}" placeholder="Unidad" class="w-full p-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
+            <input type="text" name="unidad_${uid}" placeholder="Unidad" class="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 unidad-input" readonly>
           </div>
           <div class="space-y-2">
             <label class="block text-sm font-medium text-gray-700">Total</label>
-            <input type="text" id="total_${productId}" placeholder="S/. 0.00" class="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 font-semibold" readonly>
+            <input type="text" id="total_${uid}" placeholder="S/. 0.00" class="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 font-semibold total-input" readonly>
           </div>
         </div>`;
+
       productContainer.appendChild(div);
+
+      // Referencias a los nuevos controles
+      const selectEl = div.querySelector('.producto-select');
+      const precioEl = div.querySelector('.precio-input');
+      const unidadEl = div.querySelector('.unidad-input');
+      const cantidadEl = div.querySelector('.cantidad-input');
+      const totalEl = div.querySelector('.total-input') || document.getElementById(`total_${uid}`);
+
+      // Forzar selección vacía (evita que el navegador rellene con valor anterior)
+      selectEl.selectedIndex = 0;
+
+      // Event listeners
+      selectEl.addEventListener('change', () => {
+        const opt = selectEl.selectedOptions[0];
+        if (opt && opt.value) {
+          precioEl.value = opt.getAttribute('data-precio') || '';
+          unidadEl.value = opt.getAttribute('data-unidad') || '';
+        } else {
+          precioEl.value = '';
+          unidadEl.value = '';
+        }
+        // recalcular total si hay cantidad
+        if (cantidadEl.value) {
+          const c = parseFloat(cantidadEl.value) || 0;
+          const p = parseFloat(precioEl.value) || 0;
+          totalEl.value = `S/. ${(c*p).toFixed(2)}`;
+        } else {
+          totalEl.value = 'S/. 0.00';
+        }
+      });
+
+      cantidadEl.addEventListener('input', () => {
+        const c = parseFloat(cantidadEl.value) || 0;
+        const p = parseFloat(precioEl.value) || 0;
+        totalEl.value = `S/. ${(c*p).toFixed(2)}`;
+      });
+
+      // Delegación del botón eliminar dentro del item
+      const removeBtn = div.querySelector('.remove-product');
+      removeBtn.addEventListener('click', (e) => {
+        const uidToRemove = e.currentTarget.getAttribute('data-uid');
+        removeProductItem(uidToRemove);
+      });
     }
-    function removeProductItem(id) {
-      const el = document.querySelector(`[data-product-id="${id}"]`);
-      if (el) el.remove();
-      productContainer.querySelectorAll('.product-item h4').forEach((h, idx) => h.textContent = `Producto #${idx+1}`);
-    }
-    function updateProductInfo(selectEl, id) {
-      const opt = selectEl.selectedOptions[0];
-      const precioInput = document.querySelector(`input[name="precio_${id}"]`);
-      const unidadInput = document.querySelector(`input[name="unidad_${id}"]`);
-      const cantInput = document.querySelector(`input[name="cantidad_${id}"]`);
-      if (opt && opt.value) {
-        precioInput.value = opt.getAttribute('data-precio') || 0;
-        unidadInput.value = opt.getAttribute('data-unidad') || '';
-        if (cantInput.value) calculateTotal(id);
+
+    function removeProductItem(uidOrIndex) {
+      // acepta uid (string) o índice numérico (antes se usaba índice)
+      let el;
+      if (typeof uidOrIndex === 'string') {
+        el = productContainer.querySelector(`[data-uid="${uidOrIndex}"]`);
       } else {
-        precioInput.value = '';
-        unidadInput.value = '';
-        document.getElementById(`total_${id}`).value = 'S/. 0.00';
+        el = productContainer.querySelector(`[data-product-id="${uidOrIndex}"]`) || productContainer.children[uidOrIndex-1];
+      }
+      if (el) el.remove();
+
+      // Renumerar encabezados visibles
+      productContainer.querySelectorAll('.product-item').forEach((node, idx) => {
+        const h4 = node.querySelector('h4');
+        if (h4) h4.textContent = `Producto #${idx+1}`;
+      });
+
+      // Si quedó vacío, reseteamos counters para que el siguiente agregado muestre #1
+      if (!productContainer.children.length) {
+        productBaseCounter = 0;
       }
     }
-    function calculateTotal(id) {
-      const c = parseFloat(document.querySelector(`input[name="cantidad_${id}"]`).value) || 0;
-      const p = parseFloat(document.querySelector(`input[name="precio_${id}"]`).value) || 0;
-      document.getElementById(`total_${id}`).value = `S/. ${(c*p).toFixed(2)}`;
-    }
-    window.removeProductItem = removeProductItem;
-    window.updateProductInfo = updateProductInfo;
-    window.calculateTotal = calculateTotal;
 
-    // Estado inicial
+    // ======== Form submit (nota) ========
+    notaForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData(notaForm);
+      const tipo = formData.get('tipo') || 'Entrada';          // 'Entrada' | 'Salida'
+      const isEntrada = tipo.toLowerCase() === 'entrada';
+
+      const errores = [];
+      if (isEntrada) {
+        if (!formData.get('proveedor')) errores.push('Debe seleccionar un proveedor');
+        if (!formData.get('orden_compra')) errores.push('Debe ingresar la orden de compra');
+      } else {
+        if (!formData.get('cliente')) errores.push('Debe seleccionar un cliente');
+        if (!formData.get('orden_venta')) errores.push('Debe ingresar la orden de venta');
+      }
+
+      // Items
+      const items = [];
+      const productItems = productContainer.querySelectorAll('.product-item');
+      productItems.forEach(item => {
+        const select = item.querySelector('.producto-select');
+        const cantidadInput = item.querySelector('.cantidad-input');
+        const precioInput = item.querySelector('.precio-input');
+        const uid = item.getAttribute('data-uid');
+        if (select && select.value && cantidadInput && cantidadInput.value) {
+          items.push({
+            producto: parseInt(select.value, 10),
+            cantidad: Number(cantidadInput.value),
+            precio_unitario: Number(precioInput?.value || 0)
+          });
+        }
+      });
+      if (!items.length) errores.push('Debe agregar al menos un producto');
+
+      if (errores.length) {
+        alert('Errores:\n' + errores.join('\n'));
+        return;
+      }
+
+      const proveedorId = isEntrada ? parseInt(formData.get('proveedor'), 10) : null;
+      const clienteId   = !isEntrada ? parseInt(formData.get('cliente'), 10)   : null;
+
+      const payload = {
+        tipo,
+        proveedor: proveedorId,
+        proveedor_id: proveedorId,
+        cliente: clienteId,
+        cliente_id: clienteId,
+        orden: isEntrada ? (formData.get('orden_compra') || '') : (formData.get('orden_venta') || ''),
+        orden_compra: isEntrada ? (formData.get('orden_compra') || '') : null,
+        orden_venta:  !isEntrada ? (formData.get('orden_venta')  || '') : null,
+        items
+      };
+
+      try {
+        const res = await fetch('/api/notas/crear/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          alert('❌ Error: ' + (data.error || 'No se pudo crear la nota'));
+          return;
+        }
+
+        alert('✅ Nota creada correctamente.');
+        notaForm.reset();
+        productContainer.innerHTML = '';
+        productBaseCounter = 0;
+        modal.classList.add('hidden');
+        setTipoNota('entrada'); // reset
+        // Refrescar para ver stocks actualizados
+        window.location.reload();
+      } catch (err) {
+        alert('❌ Error de red: ' + err.message);
+      }
+    });
+
+    // Inicializar estado
     setTipoNota('entrada');
+
+    // Export for debugging (opcional)
+    window.addProductItem = addProductItem;
+    window.removeProductItem = removeProductItem;
   </script>
+
 
 </body>
 </html>
