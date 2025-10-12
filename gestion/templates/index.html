@@ -31,7 +31,7 @@
                     class="w-full p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 transition-all duration-200">
             </form>
             <button id="add-note-btn"
-                    class="bg-blue-600 text-white py-3 px-6 rounded-lg font-bold shadow-lg transform transition-transform hover:scale-105 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+              class="relative z-50 bg-blue-600 text-white py-3 px-6 rounded-lg font-bold shadow-lg transform transition-transform hover:scale-105 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
               Crear nota de pedido
             </button>
           </div>
@@ -150,12 +150,18 @@
     let proveedoresData = [];
     let clientesData = [];
 
-    // Productos disponibles (inyectados por Django)
     const productosDisponibles = [
-      {% for producto in productos %}
-      { id: {{ producto.id }}, nombre: '{{ producto.nombre|escapejs }}', codigo: '{{ producto.codigo|escapejs }}', precio: {{ producto.precio }}, unidad: '{{ producto.unidad|escapejs }}' },
-      {% endfor %}
+    {% for producto in productos %}
+        {
+            id: {{ producto.id }},
+            nombre: "{{ producto.nombre|escapejs }}",
+            codigo: "{{ producto.codigo|escapejs }}",
+            precio: "{{ producto.precio|default_if_none:'0.00' }}",
+            unidad: "{{ producto.unidad|escapejs }}"
+        }{% if not forloop.last %},{% endif %}
+    {% endfor %}
     ];
+
 
     // ======== Util ========
     function getCookie(name) {
@@ -308,21 +314,20 @@
       selectEl.addEventListener('change', () => {
         const opt = selectEl.selectedOptions[0];
         if (opt && opt.value) {
-          precioEl.value = opt.getAttribute('data-precio') || '';
+          const precioNum = parseFloat(opt.getAttribute('data-precio')) || 0;
+          precioEl.value = precioNum.toFixed(2);
           unidadEl.value = opt.getAttribute('data-unidad') || '';
         } else {
           precioEl.value = '';
           unidadEl.value = '';
         }
+
         // recalcular total si hay cantidad
-        if (cantidadEl.value) {
-          const c = parseFloat(cantidadEl.value) || 0;
-          const p = parseFloat(precioEl.value) || 0;
-          totalEl.value = `S/. ${(c*p).toFixed(2)}`;
-        } else {
-          totalEl.value = 'S/. 0.00';
-        }
+        const c = parseFloat(cantidadEl.value) || 0;
+        const p = parseFloat(precioEl.value) || 0;
+        totalEl.value = `S/. ${(c * p).toFixed(2)}`;
       });
+
 
       cantidadEl.addEventListener('input', () => {
         const c = parseFloat(cantidadEl.value) || 0;
@@ -449,6 +454,6 @@
     window.removeProductItem = removeProductItem;
   </script>
 
-
+  
 </body>
 </html>
